@@ -1,0 +1,212 @@
+---
+title: "ACP avec FactoMineR"
+output: learnr::tutorial
+runtime: shiny_prerendered
+---
+
+```{r setup, include=FALSE}
+library(learnr)
+data("decathlon")
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+
+## Préparation des donées
+
+### Installation et chargement des packages 
+
+Avant de commencer il est nécessaire d'installer le ou les package(s) essentiels à notre ACP en utilisant la fonction `install.packages`.
+
+```{r install, message=TRUE, warning=TRUE, exercise=TRUE}
+install.packages("FactoMineR")
+install.packages("factoextra")
+##dans cet exemple les package sont déjà installés.
+```
+*Dans notre cas nous installons les packages `FactoMineR` (dédié à l'analyse) et  `factoextra` (dédié à la visualisation et l'interprétation).*
+
+Afin de pouvoir utiliser ces packages il est important de les charger à l'aide de la fonction `library`. 
+
+```{r charge, message=TRUE, warning=TRUE, exercise=TRUE}
+library("FactoMineR")
+library("factoextra")
+```
+
+
+### Importation des données 
+
+Ici, nous chargeons le jeu de données 'decathlon' portant sur la perfomance d'athlètes lors d'un decathlon. 
+
+```{r import, message=TRUE, warning=TRUE, exercise=TRUE}
+data("decathlon")
+
+```
+
+
+
+## Choix des variables et individus
+
+### Visualiser les données
+
+Avant de réaliser une ACP il est important de connaître les données sur lequelles l'étude va être réalisée et la problématique de l'étude. Ici, nous avons des données concernant des performances à un decathlon, l'objectif sera d'étudier le profil des participants en fonctions de leur performance.
+
+Dans un premier temps, la fonction `head`permet de visualiser les premières lignes du jeu de données.
+
+
+```{r head, message=TRUE, warning=TRUE, exercise=TRUE}
+
+head(decathlon) 
+
+```
+Ensuite, la fonction `summary` permet d'avoir des renseignements sur les variables disponibles.
+```{r summary, message=TRUE, warning=TRUE, exercise=TRUE}
+
+summary(decathlon) 
+
+```
+Grâce à cette fonction, nous pouvons remarquer que les dix premières variables sont quantitatives, elles représentent les dix épreuves du decathlon et comportent une moyenne, un minimum, une médiane... Ce sont les variables actives.
+
+Les autres variables, "Rank", "Points" (quantitatives) et "Competition" (qualitative) seront utilisées comme variables illustratives.
+
+Dans cet exemple les 4 derniers individus seront des individus illustratifs et les autres des individus actifs.
+
+## Individus et variables actifs 
+
+Dans cette partie nous étudions les profils des participants uniquement en fonction de leur performance.
+Pour cela nous nous intéresserons aux variables/individus actifs.
+
+### Création du modèle
+
+
+```{r activ,  message=TRUE, warning=TRUE, exercise=TRUE }
+decat.activ <- decathlon[1:23, 1:10]
+decat.activ
+
+```
+
+*Les individus actifs correspondent aux lignes 1:23 et les variables actives aux colonnes 1:10*
+```{r decatactiv}
+decat.activ <- decathlon[1:23, 1:10]
+res.pca<-PCA(decat.activ, graph = FALSE)
+```
+
+
+```{r pca, message = TRUE, exercise=TRUE}
+
+PCA(X, scale.unit = TRUE, ncp = 5, graph = TRUE)
+
+```
+
+Voici la formule permettant d'obtenir une ACP, elle est composée :
+
+* X -> un dataframe
+* scale.unit = TRUE -> si cette option est utilisée comme 'TRUE' elle permet la standardisation des données.
+* ncp -> nombre de composantes principales 
+* graph = TRUE -> permet la présence (TRUE) ou non (FALSE) d'un graphique.
+
+Pour pouvoir réaliser notre ACP nous devons déterimner le nombre de composantes principales (nombre d'axes à interpréter).
+
+## Composantes principales
+
+Dans un premier temps nous appliquons la formule de l'ACP sans les options vues ci-dessus. 
+
+```{r pcasimple,  message = TRUE, exercise=TRUE, exercise.setup="decatactiv"}
+res.pca<-PCA(decat.activ, graph = FALSE)
+res.pca
+
+```
+
+Il esxiste 3 méthodes permettant de définir le nombre d'axes à retenir. Pour se faire nous avons besoin des vecteurs propres correspondants.
+
+```{r eigval,  message = TRUE, exercise=TRUE, exercise.setup="decatactiv"}
+eig.val <- get_eigenvalue(res.pca)
+eig.val
+```
+
+*Gâce à cette formule nous obtenons les valeurs propres, les pourcentages et pourcentages cumulés correspondants.*
+
+### 1- Méthode du saut
+
+Dans cette méthode nous nous intéressons aux pourcentages cumulés, les axes doivent détenir au moins 80 % de l'information. Ici nous pouvons remarquer ques les dimensions 4 et 5 contienent respectivement 82 % et 89 % de l'information.
+
+### 2- Méthode de Kaiser
+
+Dans cette méthde nous retienderons les axes associés à des valeurs propres supérieures à 1. Ici, les valeurs propres (colonne eigenvalue) supérieures à 1 déterminent 4 axes.
+
+### 3- Méthode du coude (scree plot)
+
+A l'aide un histogramme, le nombre d'axes est déterminé au point au-delà duquel les valeurs propres restantes sont toutes relativement petites et de taille comparable.
+
+```{r fvizeig,  message = TRUE, exercise=TRUE, exercise.setup="decatactiv"}
+fviz_eig(res.pca, addlabels = TRUE, ylim = c(0, 50))
+```
+
+```{r nbaxes}
+question(
+  "Combien d'axes faut-il retenir ?",
+  answer("2", message = "l'information n'est pas assée représentée"),
+  answer("3", message = "l'information n'est pas assée représentée"),
+  answer("4", message = "l'information n'est pas assée représentée, sur le graphique la coupure n'est pas assez marquée pour ne retenir que 4 axes."),
+  answer("5", message = "la coupure s'effectue bien après le 5 ème axe.", correct = TRUE),
+  allow_retry = TRUE,
+  correct = "Great"
+)
+```
+
+### Conclusion
+
+A l'aide de ces différentes méthodes nous avons retenu 4 ou 5 axes. Il est alors préférable de retenir 5 axes plutôt que 4 car il y aura plus d'information.
+
+
+## Graphiques
+
+### ACP des individus et variables actifs
+
+Tout d'abord, il est nécessaire d'importer et de charger le package "FactoMineR" pour pouvoir réaliser une ACP.
+En nous aidant de la fonction suivante nous alons réaliser l'ACP sur les individus choisis. 
+
+```{r pcadecat, message = TRUE, exercise=TRUE, exercise.setup="decatactiv"}
+
+decat1 <-PCA(decat.activ, scale.unit=TRUE, ncp=5, graph=T)
+fviz_pca_ind(decat1) #individus actifs
+fviz_pca_var(decat1) #variables actives
+explor(decat1)
+```
+
+
+
+*Nous nous intéressons aux dix premières variables et 23 premiers individus, nous ne tenons pas compte des variables quantitatives supplémentaires 11 et 12 ("Rank" et "Points") ainsi que la variable qulaitative 13 ("Competition") *
+
+
+### Interprétation
+
+Nous obtenons alors un graphique regroupement l'ensemble ds individus et un autre comportant les dix premières variables.
+
+Le premier consiste à regrouper les individus similaires et dans le second les variables corrélées positivement sont du même côté.
+
+Le deuxième, contenant les variables est plus intérressant. En effet, nous pouvons remarquer que les variables concernant la rapidité ("400m", "100m", "110m.hurdle") sont corrélées entre elles. Celles concerant la force 
+sont aussi corrélées entre elles ("Discus", "Shot.put", "long.jump") mais ces deux groupes de variables ne sont pas corrélés, nous pouvons alors en déduire que la force et la vitesse n'ont pas en lien.
+
+## Individus et Variables illustratives
+
+Les variables illustratives ne participent pas à la construction de l'ACP mais sont uilisées afin d'apporter des informations supplémentaires.
+
+```{r ACP, message=TRUE, warning=TRUE, exercise=TRUE, exercise.setup="decatactiv"}
+
+decat2 <-PCA(decathlon, quanti.sup=11:12, quali.sup=13) ##ACP construit avec les 10 premières variables + individus et variables illustratives
+fviz_pca_ind(decat2) #individus actifs + illustratifs
+fviz_pca_var(decat2) #variables actives + illustratives
+explor(decat2)
+```
+
+Nous pouvons remarquer ques les variables sont apparues sur ces nouveaux graphiques. Nous constatons que le rang et le nombre de points ne sont pas corrélés. Les gagnants sont ceux qui ont un rang faible et un nombre de points élevé. 
+
+## Annexes
+
+### vidéo
+
+Voici des vidéos qui vous permettrons de réaliser des ACP de manières différentes.
+
+![ACP](https://youtu.be/i-mEyUa9U5k){width="90%"}
+
+![ACP](https://youtu.be/1QPRsg3Bxok){width="560" height="315"}
+

@@ -1,0 +1,692 @@
+---
+title: "La fonction panellipse (SensoMineR)"
+output: 
+    learnr::tutorial:
+        progressive: true
+        allow_skip: true
+runtime: shiny_prerendered
+---
+
+```{r setup, include=FALSE}
+library(learnr)
+library(SensoMineR)
+library(shiny)
+library(ggplot2)
+library(sqldf)
+library(dplyr)
+
+knitr::opts_chunk$set(echo = FALSE)
+
+sensochoc<-read.csv("../../datasets/sensochoc.csv",sep=";",header=TRUE)
+sensochoc$Product<-as.factor(sensochoc$Product)
+sensochoc$Panelist<-as.factor(sensochoc$Panelist)
+sensochoc$Rank<-as.factor(sensochoc$Rank)
+sensochoc$Session<-as.factor(sensochoc$Session)
+sensochoc<-sensochoc[,c(1,2,4,3,5,6,7,8,9,10,11,12,13,14,15,16,17,18)]
+
+```
+
+## Introduction
+
+### panellipse? 
+
+La fonction `panellipse`vient du package `SensoMineR` développé par **Francois Husson, Sebastien Lê** et **Marine Cadoret**. Elle est associée aux résultats d'une **A**.nalyse en **C**.omposantes **P**.rincipales. La problématique à laquelle répond cette fonction est la représentation des variables et des individus dans un plan factoriel qui peût en effet être trompeuse car ils sont représentés dans un sous-espace de plus petites dimensions que leurs espaces originaux respectifs. Trompeur donc car les distances entre individus ou entre variables sont réduites afin de pouvoir visualiser ces éléments. La création de zones de confiances autours des individus et des
+variables à pour but d'améliorer les représentations des distances entres les individus et entre les variables. C'est ce que
+la fonction `panellipse` fait lorsqu'elle est enclenchée.
+
+Nous allons d'abord voir (**1**) comment marche la fonction panellipse, (**2**) ses résultats, puis (**3**) nous travaillerons plus en détails la fonction pour retrouver ses résultats à la main. Pour finir (**4**) vous pourrez lancer la fonction panellipse que vous aurez construite.
+
+## Panellipse !
+
+### Les paramètres
+
+```{r,echo=TRUE, eval=FALSE, include=TRUE}
+panellipse(donnee, col.p, col.j, firstvar, lastvar = ncol(donnee),
+    alpha = 0.05, coord = c(1,2), scale.unit = TRUE, nbsimul = 500,
+    nbchoix = NULL, group = NULL, name.group = NULL,
+    level.search.desc = 0.2, centerbypanelist = TRUE,
+    scalebypanelist = FALSE, name.panelist = FALSE,
+    variability.variable = TRUE, cex = 1, color = NULL)
+```
+
+A quoi correspondent ces paramètres:
+
+-------------------------------------------------------------------------------------------------------------------------------------
+
+**Les obligatoires :**
+
+***donnee*** --> un data.frame possèdant:  
+**1:** Un ensemble de variables quantitatives (n'oublions pas que panellipse se base sur le résultat d'une ACP) qui sont des indicateurs sensoriels  
+**2:** Au moins **deux** variables qualitatives ***product*** et ***panelist***  
+
+***col.p*** --> Le numéro de la colonne ***product***
+
+***col.j*** --> Le numéro de la colonne ***panelist***
+
+***firstvar***--> Le numéro de la colonne à partir duquel les indicateurs sensoriels commencent (il est important que les indicateurs sensoriels soient tous à la suite)
+
+-------------------------------------------------------------------------------------------------------------------------------------
+
+**Les optionnels :**
+
+***lastvar*** --> Le numéro de la dernière colonne du bloc d'indicateurs sensoriels (par défaut: c'est la *dernière colonne du data.frame*)
+
+***alpha*** --> Le seuil alpha de confiance de la construction des ellipses (par défaut: *0.05*)
+
+***coord*** --> Les axes que l'on souhaite analyser (par défaut: *les axes 1 et 2*)
+
+***scale.unit*** --> Booléen qui indique si oui où non on réduit les données (variance = 1), (par défaut: *TRUE*)
+
+***nbsimul*** --> Le nombre de panels virtuels bootstrapés qui vont être générés pour construire les ellipses (par défaut: *500*)
+
+***nbchoix*** --> Le nombre de panelistes qui vont être tirés pour chaque panel virtuel (par défaut: *NULL*--> le nombre de panelist présent dans le data.frame)
+
+***group*** --> Le nombre de variable utilisées quand on fait une **A**.nalyse **F**.actorielle **M**.ultivariée (par défaut: *NULL* -> une *A.C.P* est réalisée)
+
+***name.group*** --> Le noms des groupes que l'on a choisis sous forme de vecteur (si group est != *NULL*)
+
+***level.serch.desc*** --> Le seuil maximal pour qu'un indicateur sensoriel soit considéré comme étant siginificativement différent pour l'**A**.nalisys **O**.f **V**.ariance du modèle `indicateur_sensoriel ~ Product + Panelist` (par défaut: *0.2*)
+
+***centerbypanelist*** --> Booléen qui indique si pour la construction des axes les données seront centrées ou non par panelist (par défaut: *TRUE*)
+
+***scalebypanelist*** --> Booléen qui indique si pour la construction des axes les données seront réduites ou non par panelist (par défaut: *FALSE*)
+
+***name.panelist*** --> Booléen qui indique si les noms des panelist seront présents sur le graphique des individus (par défaut: *FALSE*)
+
+***variability.variable*** --> Booléen qui indique la construction ou non d'un graphique sur la variabilité des variables (par défaut: *TRUE*)
+
+***cex*** --> Taille de la représentation des individus et des libéllés sur les graphiques (par défaut: *1*)
+
+***color*** --> Les couleurs utilisées par la fonction sous forme de vecteur (par défaut: *un vecteur de 35 couleurs*)
+
+-------------------------------------------------------------------------------------------------------------------------------------
+
+### La fonction
+
+Une première étape est de bien comprendre son jeu de données pour être sûr de ne pas faire d'erreur lorsque l'on fait tourner panellipse.
+
+```{r summary, exercise=TRUE}
+summary(sensochoc)
+```
+
+Cela peut paraître trivial mais c'est nécessaire :
+
+```{r comprehensiondata,echo=FALSE}
+quiz(caption = "Compréhension des données",
+    question("Quelle est le numéro de la colonne 'Panelist' ?",
+             answer("1",correct=TRUE),
+             answer("4"),
+             answer("3"),
+             random_answer_order = TRUE,
+             allow_retry = TRUE
+             ),
+    question("Quelle est le numéro de la colonne 'Produit' ?",
+             answer("3",correct=TRUE),
+             answer("1"),
+             answer("4"),
+             random_answer_order = TRUE,
+             allow_retry = TRUE
+             ),
+    question("Quel est le type de la variable 'Rank'?",
+             answer("qualitative",correct=TRUE),
+             answer("quantitative"),
+             allow_retry = TRUE
+             ),
+    question("Quelles propositions sont vraies ?",
+             answer("il y a 14 indicateurs sensoriels dans ce jeu de donnée",correct = TRUE),
+             answer("il y a 4 indicateurs sensoriels dans ce jeu de donnée"),
+             answer("Les indicateurs sensoriels sont des colonnes 1 à 4"),
+             answer("Les indicateurs sensoriels sont les colonnes 5 à 18",correct = TRUE),
+             random_answer_order = TRUE,
+             allow_retry = TRUE
+             )
+    )         
+```
+
+Si vous avez fait un sans-faute du premier coup c'est que vous êtes prêt pour utiliser panellipse. Néanmoins pour que vous compreniez vraiment l'importance des paramètres, voici ce qu'aurais retourné `panellipse` si vous aviez échangé les colonnes de `col.j` et `col.p`
+
+```{r ,fig.keep='last'}
+# Panellipse avec les bons paramètres aux bons endroits
+result<-panellipse(donnee=sensochoc, col.p=3, col.j=1, firstvar=5, lastvar = 18,
+    alpha = 0.05, coord = c(1,2), scale.unit = TRUE, nbsimul = 500,
+    nbchoix = NULL, group = NULL, name.group = NULL,
+    level.search.desc = 0.2, centerbypanelist = TRUE,
+    scalebypanelist = FALSE, name.panelist = FALSE,
+    variability.variable = TRUE, cex = 1, color = NULL)
+```
+
+```{r ,fig.keep='last'}
+# Panellipse avec les paramètres 'Product' et 'Panelist' inversés
+result<-panellipse(donnee=sensochoc, col.p=1, col.j=3, firstvar=5, lastvar = 18,
+    alpha = 0.05, coord = c(1,2), scale.unit = TRUE, nbsimul = 500,
+    nbchoix = NULL, group = NULL, name.group = NULL,
+    level.search.desc = 0.2, centerbypanelist = TRUE,
+    scalebypanelist = FALSE, name.panelist = FALSE,
+    variability.variable = TRUE, cex = 1, color = NULL)
+```
+
+Vous voyez bien que en plus d'être illisible, le second graphique n'a aucun sens, nous faisons des ellipses de confiances sur les panelistes. 
+
+C'est maintenant à vous de lancer panellipse, n'hésitez pas à faire varier les paramètres optionels :
+```{r lancement,exercise=TRUE}
+respan<-panellipse(donnee, col.p, col.j, firstvar, lastvar = ncol(donnee),
+    alpha = 0.05, coord = c(1,2), scale.unit = TRUE, nbsimul = 500,
+    nbchoix = NULL, group = NULL, name.group = NULL,
+    level.search.desc = 0.2, centerbypanelist = TRUE,
+    scalebypanelist = FALSE, name.panelist = FALSE,
+    variability.variable = TRUE, cex = 1, color = NULL)
+
+respan
+```
+
+```{r lancement-hint,echo=FALSE,}
+respan<-panellipse(donnee=sensochoc, col.p=3, col.j=1, firstvar=5, lastvar = 18,
+    alpha = 0.05, coord = c(1,2), scale.unit = TRUE, nbsimul = 500,
+    nbchoix = NULL, group = NULL, name.group = NULL,
+    level.search.desc = 0.2, centerbypanelist = TRUE,
+    scalebypanelist = FALSE, name.panelist = FALSE,
+    variability.variable = TRUE, cex = 1, color = NULL)
+
+respan
+```
+
+
+## Les résultats
+
+### Les tableaux 
+```{r respan,echo=FALSE,fig.keep='none'}
+# Lancement de panellipse, les résultats de ce chunk seront réutilisés dans d'autres chunks
+respan<-panellipse(donnee=sensochoc, col.p=3, col.j=1, firstvar=5, lastvar = 18,
+    alpha = 0.05, coord = c(1,2), scale.unit = TRUE, nbsimul = 500,
+    nbchoix = NULL, group = NULL, name.group = NULL,
+    level.search.desc = 0.2, centerbypanelist = TRUE,
+    scalebypanelist = FALSE, name.panelist = FALSE,
+    variability.variable = TRUE, cex = 1, color = NULL)
+```
+
+```{r analyseres,echo=TRUE,eval=FALSE}
+# Les différents éléments des résultats du lancement de panellipse
+respan$coordinates$moyen
+respan$eig
+respan$hotelling
+respan$correl
+
+```
+
+Nous avons le tableau des corrélations entre les produits. Plus les coefficients sont élevés, plus les produits se ressemblent et inversement.
+```{r hotelling, fig.keep='last', exercise=TRUE, exercise.setup="respan"}
+# Mise en forme de l'élément respan$hotelling
+coltable(respan$hotelling, main.title ="P-values for the Hotelling T2 tests")
+```
+
+L'éboulis des valeurs propres, on voit qu'avec seulement 2 axes on est capables de projeter plus de 96 % de l'information de notre jeu de données.
+```{r eig,exercise.setup="respan",exercise=TRUE,fig.keep='last'}
+# Mise en forme de l'élément respan$eig sous forme de barplot
+barplot(respan$eig[,2], main="Eigenvalues en %", xlab="Dimension", ylab="Eigenvalues",names.arg=1:nrow(respan$eig))
+respan$eig
+```
+
+Nous avons également le tableau des corrélations des indicateurs sensoriels, même fonctionnement et interprétations que pour celui des produits.
+```{r correl,exercise.setup="respan",exercise=TRUE,fig.keep='none'}
+# Mise en forme de l'élément respan$correl
+# on peut changer $moy par $mix ou $max
+coltable(respan$correl$moy, main.title ="Correlation for the Hotelling sensory descriptors")
+```
+
+### Les graphiques
+
+-------------------------------------------------------------------------------------------------------------------------------------
+
+Graphique 1: ***PCA graph of variables***
+Cercle des corrélations des variables. Rien de particulier par rapport à une ACP classique.
+
+-------------------------------------------------------------------------------------------------------------------------------------
+
+Graphique 2: ***PCA graph of individuals***
+Graphique des produits. Rien de particulier par rapport à une ACP classique.
+
+-------------------------------------------------------------------------------------------------------------------------------------
+
+Graphique 3: ***Individual description***  
+Rajout des juges sur le graphiques des produits. Rien de particulier par rapport à une ACP classique.
+
+-------------------------------------------------------------------------------------------------------------------------------------
+
+Graphique 4: ***PCA graph of variables***  
+Avec les panels virtuels générés, nous nous retrouvons avec des matrices supplémentaires de données (1 matrices par panel). Ces matrices sont projetées en tant que variables illustratives sur l'ACP effectuée d'après les données de bases. On observe que plus le test de Fisher lors de l'ANOVA était significatif, moins les points supplémentaires sont dispersés sur le cercle des corrélations.
+
+-------------------------------------------------------------------------------------------------------------------------------------
+
+Grpahique 5: ***Confidence ellipses for the mean points***  
+Les ellipses sont tracées autour des produits moyens, ce sont des ellipses de confiance au seuil 95 %. Lorsque deux ellipses se chevauchent, c'est que le jury ne distingue pas clairement les deux produits (les indicateurs sensoriels des produits sont très similaires), que ces produits se ressemblent beaucoup. A l'inverse, plus les ellipses sont éloignées, plus les produits sont différents. On cherche à avoir des ellipses de petites tailles car cela veut dire qu'on est très précis sur la position du produit sur les axes 1 et 2.
+
+-------------------------------------------------------------------------------------------------------------------------------------
+## Le détail
+
+### Principe
+
+Panellipse fonctionne de la manière suivante: en premier lieu, elle effectue une **ANOVA sur chaque indicateur sensoriel** du jeu de donnée (le seuil de l'ANOVA peut être modifié avec le paramètre: `level.search.desc`). Ensuite, des panels virtuels sont générés en utilisant le **bootsraping** (le nombres de panels virtuels et leur taille peuvent être modifiés avec les paramètres: `nbsimul`et `nbchoix`). Les panels virtuels sont utilisés comme individus supplémentaires à l'ACP, c'est pour cela que l'on reprend les même coordonnées sur les axes pour les panelistes. Les **coordonnées des produits** vont être calculées en fonction des individus qui composent les panels virtuels, à chaque panel correspond 6 produits virtuels. Finalement chaque produit va être entouré par une **ellipse de confiance** qui est générée pour englober 95 % des produits virtuels (le seuil peut être modifié avec le paramètre `alpha`). 
+
+
+### Bootsraping et panels virtuels
+
+-------------------------------------------------------------------------------------------------------------------------------------
+
+Qu'est-ce que le bootstraping? 
+  - C'est une méthode de réplication de données par rééchantillonage sur nos données de bases. Nous allons appliquer cette méthode afin de créer des panels virtuels.  
+
+Pourquoi utiliser le bootstrap?  
+  - Un panel coûte très cher et pour limiter les dépenses le fait de répliquer des données sur nos données de bases est une économie.  
+  - Pour étudier la variabilité de notre panel. 
+
+-------------------------------------------------------------------------------------------------------------------------------------
+
+Nous avons notre jeu de données `sensochoc.rda`, qui est composé de fiches de dégustations sur ***6 produits*** par ***29 juges***. Le principe de création de panels virtuels est de nous faire tirer des panels composés de ***x*** panelistes selon nos besoins par *tirages aléatoires* ***avec*** *remise*, chaque juge a la même probabilité d'être tiré, en effet il n'y a aucune raison d'accorder plus d'importance à un juge qu'à un autre. Cette opération on va la répéter ***y*** fois selon nos besoins (500 fois dans la fonction panellipse par défaut). 
+
+Notre panel de base est constitué de tous nos panelistes de 1 à 29 qui sont tous présents 1 fois sans exception dans notre panel.  
+
+Dans nos panels virtuels, non seulement la présence de tous les panelistes n'est pas forcement sûr, cela dépend de la taille de notre panel virtuel, si on le compose de 100 panelistes, il y a de grandes chances qu'ils y soient tous. A l'inverse comme dans notre exemple où nous n'allons prendre que 20 panelistes pour notre panel, nous sommes certain qu'il y aura au minimum 9 absents. *Au minimum* car comme le tirage est ***avec*** remise, un même panelist peut donc être choisi plusieurs fois dans notre panel, ce qui laisse encore moins de place pour les autres panellistes.
+
+Pour un tirage aléaoire, on peut utiliser la fonction `sample`, avec comme paramètre: replace=TRUE pour faire le tirage avec remise.
+```{r taar,exercise=TRUE}
+(sample(x,y,replace=TRUE))
+```
+
+```{r taar-hint,echo=FALSE}
+sample(min:max,nbitération,replace=TRUE)
+```
+
+### 
+
+Regardons matintenant comment varient la tailles des ellipses de confiance autour de nos produits moyens en fonction du nombre de panels virtuels créés et du nombre de panelistes qui les composent. On peut remarquer que les ellipses sont plutôt stable à partir de 400 tirages de panels lorsque les panels comportent 20 panelistes, on prend 500 pour plus de sécurité. On pourrait continuer à tirer des panels virtuels, mais on voit bien que ce ne serait pas très utile, ils ne nous apporteraient pas beaucoup d'informations.
+
+```{r,echo=FALSE}
+# On impute à la variable nbjuge le nombre de Panelist du dataset sensochoc
+nbjuge<-nlevels(sensochoc$Panelist)
+# On utilise des barres à faire glisser par l'utilisateur pour le nombre de panels et de panelists par panels
+sliderInput("z","Nb_panels",min=1,max=600,value=300,step=1)
+sliderInput("p","Nb_paneliste",min=5,max=nbjuge,value=20,step=1)
+plotOutput("con")
+```
+
+```{r,context="server"}
+
+output$con<-renderPlot({
+  # On impute à la variable nbjuge le nombre de Panelist du dataset sensochoc
+  nbjuge<-nlevels(sensochoc$Panelist)
+  # Utilisation de panellipse sur sensochoc
+  res<-panellipse(sensochoc,col.p = 3,col.j = 1,firstvar=5)
+  # Séparation des coordonnées des produits moyens et celles des individus sur les axes 1 et 2
+  pdt_moy<-res$coordinates$moyen[1:6,]
+  indiv<-res$coordinates$moyen[7:180,]
+  # Création d'un data frame barycentre2 vide
+  barycentre2<-as.data.frame(cbind(c(0),c(0),c(0)))
+  barycentre2<-barycentre2[-1,]
+  # Renommage des colonnes de barycentre2
+  names(barycentre2)<-c("Dim1","Dim2","Product")
+  # Boucle allant effectuer notre bootstraping autant de fois que l'utilisateur aura choisi avec la barre à glisser
+  for ( p in 1:input$z) {
+    # Création d'un dataframe dans lequel on stock notre échantillon d'identifiant par tirage aléatoire sans remise (tirage entre 1 et le nombre de panelistes choisis par l'utilisateur)
+    ech<-as.data.frame(sample(1:nbjuge,input$p,replace=TRUE))
+    # Renommage de la colonne du dataframe s pour faciliter la suite
+    names(ech)<-c("Panelist2")
+    # Passage en facteur de notre colonne numérique
+    ech$Panelist2<-as.factor(ech$Panelist2)
+    # Jointure gauche entre notre dataframe de coordonnées des individus et de s dans le dataframe test
+    test<-sqldf("select * from indiv i left join ech e on i.Panelist=e.Panelist2")
+    # création d'un dataframe compte qui compte le nombre de fois l'apparition de chaque paneliste dans le dataframe test
+    compte<-test%>%
+      group_by(Panelist2)%>%
+      count(Panelist2)
+    # Division du compte de chaque panelist par 6 car il apparait forcément 6 fois car 6 produits
+    compte$n<-(compte$n/6 )
+    # Suppression des valeurs manquantes pour supprimer les panelistes qui n'ont pas été sélectionnés
+    compte<-na.omit(compte)
+    # Renommage des colonnes de ponderation
+    names(compte)<-c("Panelist","n")
+    # Merge de indiv et compte par panelist dans le dataframe test
+    test<-merge(indiv,compte,by="Panelist")
+    # Calcul de la moyenne par produit sur les dimensions 1 et 2 dans barycentre2
+    barycentre<-test%>%
+      group_by(Product)%>%
+      summarise(Dim1=(sum((Dim1*n))/input$p),
+                Dim2=(sum((Dim2*n))/input$p)
+      )
+    # Ajout verticale de barycentre à barycentre2, à la fin de la boucle barycentre2 comporte l'ensemble des coordonnées des produits virtuels de tous les panels virtuels
+    barycentre2<-rbind(barycentre2,barycentre)
+  }
+  # Calcul des moyennes des cooronnées des produits virtuels sur les axes 1 et 2
+  barycentrefinal<-barycentre2%>%
+    group_by(Product)%>%
+    summarise(Dim1=mean(Dim1),
+              Dim2=mean(Dim2)
+    )
+  # Graphique avec les points moyens des produits virtuels et les ellipses de confiances construites sur l'ensemble des produits virtuels
+  ggplot(barycentrefinal,aes(x=Dim1,y=Dim2,shape=Product,color=Product))+geom_point()+stat_ellipse(data=barycentre2,aes(x=Dim1,y=Dim2,color=Product))
+})
+
+```
+
+### Construction
+
+On va chercher maintenant à retrouver nos produits moyens après la création de nos 500 panels virtuels.  
+Les ellipses de confiances sont tracées autour des points moyens des produits virtuels, lors du lancement de panellipse, on obtient une table de résultats sur laquelle on retrouve les coordonnées des produits moyens et des panellistes sur les axes 1 et 2, les coordonnées des produits sont les vrais *points moyens*, ce sont les moyennes des coordonnées des individus du *panel originel* des 29 juges sur les axes 1 et 2.  
+
+```{r coor,exercise.setup="respan",exercise=TRUE,fig.keep='last'}
+respan$coordinates$moyen
+```
+
+Théroriquement, comme chaque paneliste à la même probabilité d'être choisi que les autres à chaque tirage, si on faisait un très grand nombres de tirages de panels virtuels on retomberait exactement sur les vrais points moyens de chaque produit.  
+
+Séparons d'abord nos produits moyens et nos coordonnées d'individus en deux datasets distincts.
+
+```{r sep,exercise.setup="respan",exercise=TRUE,fig.keep='none'}
+pdt_moyen<-
+indiv<-
+```
+
+```{r sep-hint}
+pdt_moyen<-respan$coordinates$moyen[ligne_pdt1:ligne_pdt6,]
+indiv<-respan$coordinates$moyen[ligne_ind1:ligne_ind174,]
+```
+
+### 
+
+On doit maintenant tirer aléatoirement un panel de 20 panelistes, on pourra associer chaque nombre sorti par le résultat de la fonction sample à l'identifiant d'un paneliste. Attention avec la fonction sample, il faudra transformer notre échantillon en dataframe `ech`.
+```{r panel_virtuel,exercise=TRUE,exercise.setup="respan"}
+pdt_moyen<-respan$coordinates$moyen[1:6,]
+indiv<-respan$coordinates$moyen[7:180,]
+ech<-as.data.frame(sample(1:29,20,replace=TRUE))
+
+```
+
+```{r ppp,echo=FALSE}
+ech<-as.data.frame(sample(1:29,20,replace=TRUE))
+```
+
+Maintenant que l'on a nos deux dataframes, pour un soucis de simplicité on renommera la colonne de notre dataframe `ech` en `Panelist2` par exemple, l'important est que le nom des deux colonnes avec les identifiants de panelistes soient différentes (nous verrons après pourquoi). Attention le résultat de la fonction sample est numérique et notre colonne l'est donc aussi, il faut donc la transformer en facteur (nous verrons après pourquoi).
+```{r ech,exercise=TRUE,exercise.setup="ppp"}
+
+```
+
+```{r ech-hint}
+Pour renommer les colonnes du dataframe:
+    names(dataframe)<-c("nom colonne1","nom colonne2",etc...)
+
+Pour passer une colonne en facteur: 
+    as.factor()
+```
+
+```{r dataframecomplet,echo=FALSE,fig.keep='none'}
+# Création des éléments précédant aux propres dans un seul cunk pour pouvoir être réutilisés dans les chunks suivants
+respan<-panellipse(donnee=sensochoc, col.p=3, col.j=1, firstvar=5, lastvar = 18)
+indiv<-respan$coordinates$moyen[7:184,]
+names(ech)<-c("Panelist2")
+ech$Panelist2<-as.factor(ech$Panelist2)
+
+```
+
+Maintenant on va effectuer une jointure entre nos deux dataframes `ech` et `indiv` sur les identifiants de panelistes avec par exemple la library `sqldf` qui permet d'utiliser le language sql dans R.
+```{r jointure,exercise=TRUE,exercise.setup="dataframecomplet",fig.keep='none'}
+library(sqldf)
+panel<-sqldf("select * from indiv i left join ech e on i.Panelist=e.Panelist2;")
+panel
+```
+
+  De cette façon observe que les panelistes non choisis ont des ***Na*** dans la colonne Panelist2, que les panelistes choisis 1 fois sont présents 6 fois (1 fois pour chaque produit) et les panelistes choisis $x$ fois sont présents $6*x$ fois ($x$ fois par produit).
+On va maintenant procéder à un comptage de ceux-ci dans le dataframe `compte` en fonction du nombres de fois qu'ils sont apparus dans le dataframe `panel` grâce à la fonction `%>%`du package dplyr. Si nous avions tout à l'heure renommer nos identifiants de panelistes de la même manière dans nos deux dataframes, nous aurions eu deux colonnes identique répondant au nom de `Panelist`, nous n'aurions pas pu effecteur de `group_by` et donc pas pu effecteur notre `count` non plus.
+
+```{r filtre,echo=TRUE,eval=FALSE}
+compte<-panel%>%
+        group_by(Panelist2)%>%
+        count(Panelist2)
+```
+ 
+Puis maintenant on va pondérer nos effectifs et retirer les panelistes qui ont été tirés 0 fois dans notre échantillon dans notre dataframe `compte`.
+```{r comptage,echo=FALSE,fig.keep='none'}
+# Création des éléments précédant aux propres dans un seul cunk pour pouvoir être réutilisés dans les chunks suivants
+respan<-panellipse(donnee=sensochoc, col.p=3, col.j=1, firstvar=5, lastvar = 18)
+indiv<-respan$coordinates$moyen[7:184,]
+names(ech)<-c("Panelist2")
+ech$Panelist2<-as.factor(ech$Panelist2)
+
+panel<-sqldf("select * from indiv i left join ech e on i.Panelist=e.Panelist2;")
+panel
+
+compte<-panel%>%
+        group_by(Panelist2)%>%
+        count(Panelist2)
+```
+
+```{r ponderation,exercise.setup="comptage",exercise=TRUE,fig.keep='none'}
+#pondération
+compte<-
+#suppression des valeurs manquantes
+compte<-
+
+
+```
+
+```{r ponderation-hint }
+compte$n<-(compte$n/6 )
+compte<-na.omit(compte)
+```
+
+Pour pouvoir effectuer un `merge` de deux dataframes, nous avons renommé "Panelist2" en "Panelist" avec la fonction `names`. Il ne nous reste plus qu'à calculer les coordonnées des produits virtuels de ce panel en pondérant simplement les coordonnées des panelistes par le nombres d'individus présent dans le panel. 
+```{r,echo=TRUE,eval=FALSE}
+names(compte)<-c("Panelist","n")
+test<-merge(indiv,compte,by="Panelist")
+```
+
+
+```{r calcul_bary,fig.keep='none',eval=FALSE}
+# Création des éléments précédant aux propres dans un seul cunk pour pouvoir être réutilisés dans les chunks suivants
+respan<-panellipse(donnee=sensochoc, col.p=3, col.j=1, firstvar=5, lastvar = 18)
+indiv<-respan$coordinates$moyen[7:184,]
+names(ech)<-c("Panelist2")
+ech$Panelist2<-as.factor(ech$Panelist2)
+
+panel<-sqldf("select * from indiv i left join ech e on i.Panelist=e.Panelist2;")
+panel
+
+compte<-panel%>%
+        group_by(Panelist2)%>%
+        count(Panelist2)
+compte$n<-(compte$n/6 )
+compte<-na.omit(compte)
+
+names(compte)<-c("Panelist","n")
+test<-merge(indiv,compte,by="Panelist")
+```
+
+```{r barycentre,exercise.setup="calcul_bary",exercise=TRUE}
+
+```
+
+```{r barycentre-hint}
+
+Utilise %>% pour filtrer, group by pour grouper par Product, summarise pour afficher les calculs que tu souhaites;
+```
+
+```{r barycentre-hint-2}
+barycentre<-test%>%
+    group_by(Product)%>%
+    summarise(Dim1=(sum((Dim1*n))/20),
+              Dim2=(sum((Dim2*n))/20)
+```
+
+### 
+
+Bravo ! Vous avez réussi à retrouver les produits virtuels du panel. Maintenant il est temps de lancer panellipse par vous même en créant 500 panels
+
+## Votre fonction panellipse !
+
+### La boucle 
+
+Nous allons devoir créer non pas 1 mais 500 panels virtuels cette fois-ci. Pour cela nous utiliserons une boucle for. Seulement, il va falloir conserver nos précédants résultats à chaque itération de la boucle, nous allons donc créer un dataframe `barycentre2` vide où nous stockerons nos résultats pour chaques panels virtuels.
+
+```{r barycentre2,exercise=TRUE}
+barycentre2<-as.data.frame(cbind(c(0),c(0),c(0)))
+# On retire la seule ligne de notre dataframe
+barycentre2<-barycentre2[-1,]
+names(barycentre2)<-c("Dim1","Dim2","Product")
+```
+
+```{r envirr,echo)false,fig.keep='none'}
+# Création des éléments précédant aux propres dans un seul cunk pour pouvoir être réutilisés dans les chunks suivants
+res<-panellipse(sensochoc,col.p = 3,col.j = 1,firstvar=5)
+pdt_moyen<-res$coordinates$moyen[1:6,]
+indiv<-res$coordinates$moyen[7:180,]
+
+barycentre2<-as.data.frame(cbind(c(0),c(0),c(0)))
+barycentre2<-barycentre2[-1,]
+names(barycentre2)<-c("Dim1","Dim2","Product")
+```
+
+
+Lançons maintenant notre boucle en rajoutant toutefois un petit bout de code envoyant les produits virtuels du panels dans `barycentre2`. 
+
+```{r boucle, exercise=TRUE,exercise.setup="envirr",fig.keep='none',exercise.timelimit=90}
+for ( p in 1:500) {
+  # Création d'un dataframe dans lequel on stock notre échantillon d'identifiant par tirage aléatoire sans remise (tirage entre 1 et le nombre de panelistes choisis par l'utilisateur)
+  ech<-as.data.frame(sample(1:nbjuge,input$p,replace=TRUE))
+  # Renommage de la colonne du dataframe s pour faciliter la suite
+  names(ech)<-c("Panelist2")
+  # Passage en facteur de notre colonne numérique
+  ech$Panelist2<-as.factor(ech$Panelist2)
+  # Jointure gauche entre notre dataframe de coordonnées des individus et de s dans le dataframe test
+  test<-sqldf("select * from indiv i left join ech e on i.Panelist=e.Panelist2")
+  # création d'un dataframe compte qui compte le nombre de fois l'apparition de chaque paneliste dans le dataframe test
+  compte<-test%>%
+    group_by(Panelist2)%>%
+    count(Panelist2)
+  # Division du compte de chaque panelist par 6 car il apparait forcément 6 fois car 6 produits
+  compte$n<-(compte$n/6 )
+  # Suppression des valeurs manquantes pour supprimer les panelistes qui n'ont pas été sélectionnés
+  compte<-na.omit(compte)
+  # Renommage des colonnes de ponderation
+  names(compte)<-c("Panelist","n")
+  # Merge de indiv et compte par panelist dans le dataframe test
+  test<-merge(indiv,compte,by="Panelist")
+  # Calcul de la moyenne par produit sur les dimensions 1 et 2 dans barycentre2
+  barycentre<-test%>%
+    group_by(Product)%>%
+    summarise(Dim1=(sum((Dim1*n))/20),
+              Dim2=(sum((Dim2*n))/20)
+    )
+  # Ajout verticale de barycentre à barycentre2, à la fin de la boucle barycentre2 comporte l'ensemble des coordonnées des produits virtuels de tous les panels virtuels
+  barycentre2<-rbind(barycentre2,barycentre)
+}
+barycentre2
+```
+
+### Barycentre et comparaison
+
+```{r envi,echo=FALSE,fig.keep='none'}
+# Création des éléments précédant aux propres dans un seul cunk pour pouvoir être réutilisés dans les chunks suivants
+res<-panellipse(sensochoc,col.p = 3,col.j = 1,firstvar=5)
+pdt_moyen<-res$coordinates$moyen[1:6,]
+indiv<-res$coordinates$moyen[7:180,]
+
+barycentre2<-as.data.frame(cbind(c(0),c(0),c(0)))
+barycentre2<-barycentre2[-1,]
+names(barycentre2)<-c("Dim1","Dim2","Product")
+
+for ( p in 1:1000) {
+    ech<-as.data.frame(sample(1:29,20,replace=TRUE))
+    names(ech)<-c("Panelist2")
+    ech$Panelist2<-as.factor(ech$Panelist2)
+    panel<-sqldf("select * from indiv i left join ech e on i.Panelist=e.Panelist2")
+    compte<-panel%>%
+        group_by(Panelist2)%>%
+        count(Panelist2)
+    compte$n<-(compte$n/6 )
+    compte<-na.omit(compte)
+    names(compte)<-c("Panelist","n")
+    test<-merge(indiv,compte,by="Panelist")
+    barycentre<-test%>%
+        group_by(Product)%>%
+        summarise(Dim1=(sum((Dim1*n))/20),
+                  Dim2=(sum((Dim2*n))/20)
+        )
+    barycentre2<-rbind(barycentre2,barycentre)
+}
+barycentrefinal<-barycentre2%>%
+    group_by(Product)%>%
+    summarise(Dim1=mean(Dim1),
+              Dim2=mean(Dim2)
+    )
+
+```
+
+Puis de refaire une moyenne par produit pour trouver nos barycentres. Normalement nous ne devrions tomber pas très loin (même très proche) de nos produits moyens.
+
+```{r baryfinal, exercise=TRUE,exercise.setup="envi",fig.keep='none'}
+# Calcul des moyennes des cooronnées des produits virtuels sur les axes 1 et 2
+barycentrefinal<-barycentre2%>%
+    group_by(Product)%>%
+    summarise(Dim1=mean(Dim1),
+              Dim2=mean(Dim2)
+    )
+barycentrefinal
+```
+
+On peut comparer en utilisant la fonction `cbind`:
+```{r comparatif, exercise=TRUE,exercise.setup="envi",fig.keep='none'}
+# Ajout horizontale des dataframes barycentrefinal et pdt_moyen
+comparatif<-cbind(barycentrefinal,pdt_moyen)
+comparatif
+```
+
+### Les ellipses 
+
+Il est maintenant l'heure de tracer nos ellipses de confiances, actuellement nous avons un graphique ressemblant à cela:
+```{r graph,fig.keep='last',echo=FALSE}
+# Création des éléments précédant aux propres dans un seul cunk pour pouvoir être réutilisés dans les chunks suivants
+res<-panellipse(sensochoc,col.p = 3,col.j = 1,firstvar=5)
+pdt_moyen<-res$coordinates$moyen[1:6,]
+indiv<-res$coordinates$moyen[7:180,]
+
+barycentre2<-as.data.frame(cbind(c(0),c(0),c(0)))
+barycentre2<-barycentre2[-1,]
+names(barycentre2)<-c("Dim1","Dim2","Product")
+
+for ( p in 1:500) {
+    ech<-as.data.frame(sample(1:29,20,replace=TRUE))
+    names(ech)<-c("Panelist2")
+    ech$Panelist2<-as.factor(ech$Panelist2)
+    panel<-sqldf("select * from indiv c left join ech s on c.Panelist=s.Panelist2")
+    compte<-panel%>%
+        group_by(Panelist2)%>%
+        count(Panelist2)
+    compte$n<-(compte$n/6 )
+    compte<-na.omit(compte)
+    names(compte)<-c("Panelist","n")
+    test<-merge(indiv,compte,by="Panelist")
+    barycentre<-test%>%
+        group_by(Product)%>%
+        summarise(Dim1=(sum((Dim1*n))/20),
+                  Dim2=(sum((Dim2*n))/20)
+        )
+    barycentre2<-rbind(barycentre2,barycentre)
+}
+barycentrefinal<-barycentre2%>%
+    group_by(Product)%>%
+    summarise(Dim1=mean(Dim1),
+              Dim2=mean(Dim2)
+    )
+
+```
+ 
+On peut rajouter des ellipses avec l'option graphique `+stat_ellipse()` du package `ggplot2`:
+```{r ellipses,exercise=TRUE,exercise.setup="graph",fig.keep='last',exercise.timelimit=90}
+ggplot(barycentrefinal,aes(x=Dim1,y=Dim2,shape=Product,color=Product))+ geom_point()+xlim(-6,10)+ylim(-6,4)
+```
+
+```{r ellipses-hint,echo=FALSE}
+?stat_ellipse
+```
+
+```{r ellipses-hint-2,echo=FALSE}
++stat_ellipse(data=barycentre2,aes(x=Dim1,y=Dim2,shape=Product,color=Product)+ geom_point())
+```
