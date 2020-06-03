@@ -1,6 +1,6 @@
 #' tea
 #'
-#' @'format Data frame:
+#' @format Data frame:
 #' \describe{
 #'}
 "tea"

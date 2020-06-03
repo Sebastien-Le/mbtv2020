@@ -1,6 +1,6 @@
 #' wines
 #'
-#' @'format Data frame:
+#' @format Data frame:
 #' \describe{
 #'}
 "wines"

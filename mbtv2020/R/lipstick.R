@@ -1,6 +1,6 @@
 #' lipstick
 #'
-#' @'format Data frame:
+#' @format Data frame:
 #' \describe{
 #'}
 "lipstick"

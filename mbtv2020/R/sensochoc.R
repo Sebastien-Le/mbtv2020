@@ -1,6 +1,6 @@
 #' sensochoc
 #'
-#' @'format Data frame:
+#' @format Data frame:
 #' \describe{
 #'}
 "sensochoc"

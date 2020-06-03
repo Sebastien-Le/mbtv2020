@@ -1,6 +1,6 @@
 #' perfumes
 #'
-#' @'format Data frame:
+#' @format Data frame:
 #' \describe{
 #'}
 "perfumes"

@@ -1,6 +1,6 @@
 #' decathlon
 #'
-#' @'format Data frame:
+#' @format Data frame:
 #' \describe{
 #'}
 "decathlon"
