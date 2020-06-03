@@ -1,0 +1,78 @@
+---
+title: "MFA with FactoMineR"
+output: learnr::tutorial
+runtime: shiny_prerendered
+---
+
+```{r setup, include=FALSE}
+library(learnr)
+library(SensoMineR)
+library(mbtv2020)
+
+knitr::opts_chunk$set(echo = TRUE)
+data("wines")
+res <- MFA(wines, group=c(5,3,10,9), type=c(rep("s",4)),
+           ncp=5, name.group=c("olf","vis","olfag","gust"),graph = FALSE)
+
+```
+
+## MFA
+
+Multiple factor analysis (MFA) applies when individuals are described by variables than can be a priori structured into groups of the same type (variables of a given group must all be either quantitative or qualitative). In MFA, we consider the merged data set $X=[X_1 X_2…X_J ]$, where $X_j$ denotes the data set associated with the variables of group j. Practically, to each group of variables is associated a multivariate point of view, and this is precisely this multitude of points of view that we want to compare when performing an MFA. More precisely, we want to extract the common dimensions to the J groups of variables, as well as their specific ones. Once the common dimensions determined, one of the main objectives of MFA is to provide a representation of the individuals as common as possible to the $J$ points of view.  
+To illustrate the method, we're using the data that have already been used when presenting PCA, where we have at our disposal the sensory profiles provided by an expert panel on the one hand, denoted $X_{\text {Expert}}$, by a consumer panel on the other hand, denoted $X_{\text {Consumer}}$. Performing a Multiple Factor Analysis on the merged data set $X=\left[X_{\text {Expert}} X_{\text {Consumer}}\right]$ allows to compare the representation of the perfumes provided by the expert panel (cf. **Figure 3.4**), to the representation of the perfumes provided by the consumer panel (cf. **Figure 3.18**). Let us remind that both representations were obtained by performing a PCA on the matrices $X_{\text {Expert}}$ and $X_{\text {Consumer}}$, respectively.
+
+```{r ind,exercise=TRUE}
+res.pca<-PCA(wines,graph=FALSE)
+plot(res.pca,choix="ind")
+```
+**Figure 3.4**
+
+This comparison is done within a single framework, based on a consensus representation issued from both panels. Naturally, in order to get that consensus, points of view have to be balanced. In MFA, the idea is to give the same weight to each one of the first principal component of each group of variables, without modifying the multivariate structure of each group. In other words each group of variables is submitted to an homogeneous dilation (aka homothety), such as the variance of the first component of each group (once transformed, i.e. after the dilation) equals 1; de facto the main information of each group has the same weight, and a consensus can be reasonably obtained based on all groups.  
+Technically, for all j, variables of group j are weighted by $1 / \lambda_{1}^{j}$, where $\lambda_{1}^{j}$ denotes the first eigenvalue of the multivariate analysis of $X_j$ (a PCA when variables of group j are quantitative, an MCA when they are qualitative, a CA when X_j is a contingency table).Figure 3.19 and Table 3.12 illustrate how the dilation works.
+
+Even though the respective ranges of Error! Reference source not found. and Error! Reference source not found. are different, the two representations are exactly the same in terms of relative distances between the products.
+
+Insert Table 17 around here
+```{r}
+res$eig
+```
+
+The first eigenvalue of the PCA performed on the weighted variables of $X_{\text {Consumer}}$ equals 1 (cf.Table 3.12, second column) and the multivariate structure remains the same (cf. Table 3.12, third and fourth columns).
+While the variance of the first component of $X_{\text {Expert}}$ equals 7,710 (cf. Table 3.3) and the variance of the first component of $X_{\text {Consumer}}$ equals 11,039 (cf.Table 3.12), thanks to its particular weighting, MFA balances the part of each group within a global analysis. In our example, this global analysis is a weighted PCA of the merged data set $X=\left[X_{\text {Expert}} X_{\text {Consumer}}\right]$.  
+As a principal axes method, MFA provides a representation of the rows, in the example the products, and the columns, in the example, the sensory descriptors used by both panels.  
+
+```{r}
+plot(res,choix = "ind")
+```
+
+Figure 3.20 represents the common information between the expert panel and the consumer panel, the part of each panel being balanced. As expected, the main axis of variability opposes ***Shalimar***, ***Aromatics Elixir***, on one side of the plane, to ***J'adore EP***, ***J'adore ET*** and ***Pleasures***, on the other side of the plane: this opposition corresponds to the one we find in Figure 3.4. and in 3.18.  
+
+```{r var, exercise=TRUE}
+plot(res, choix="var")
+```
+
+Figure3.21 is of particular interest when comparing the expert and the consumer panels as we can see how homologous descriptors are correlated, and how different sensory descriptors can be interpreted the same way by the two panels. The descriptor ***spicy*** seems to be understood the same way by both panels, which is not quite the case for the descriptor ***citrus***. The descriptor ***greedy*** used by the expert panel is very close to the descriptor ***honey*** used by the consumer panel.  
+As in all principal axes methods we've seen so far, MFA can also handle illustrative information. After all, the core of MFA is a weighted PCA.  
+Figure 3.22. is one of the most important outputs provided by MFA as it represents how the separate multivariate analysis of each group is linked to the consensus issued from MFA. To obtain this figure, for all $j$, the components of the separate multivariate analysis of the variables of group j are projected as illustrative information on the axes issued from MFA performed on all $J$ groups.  
+
+```{r axes, exercise=TRUE}
+plot(res, choix="axes",title="Correlations circle")
+```
+
+As we can see Figure 3.22, the first component of the PCA performed on  $X_{\text {Expert}}$, and the first component of the PCA performed on  $X_{\text {Consumer}}$ are closely correlated to the first component of the MFA performed on $X=\left[X_{\text {Expert}} X_{\text {Consumer}}\right]$. The same comment applies for the second component.
+Remark. In MFA, illustrative groups of variables can also be considered in the analysis.   
+Finally, MFA provides two very specific graphical outputs that are the representation of the groups (cf. Figure 3.23) and the partial representations of the individuals (cf. Figure 3.24).
+
+```{r group,exercise=TRUE}
+plot.MFA(res, choix="group",title="Groups graph")
+```
+
+In the representation of the groups, the coordinate of a group of variables $j$ on an axis of rank $s$ is obtained by calculating the $Lg$ measure between the variables of the group $j$ and $F_s$ the coordinates of the individuals on the axis of rank $s$. Due to the weighting used in MFA to balance the part of each group, the coordinates of the groups of variables lie in $[0,1]$. The coordinate of a given group is all the more close to 1 than the variables of this group are highly correlated with the dimension issued from the MFA (either positively or negatively). Hence, two groups are all the more close than the structure they induce on the individuals are close.  
+As shown by Figure 3.23, the structure on the perfumes induces by experts and the consumers are really close.  
+This result is confirmed by the representation of the perfumes described by the expert and the consumers.  
+
+```{r ind_partial, exercise=TRUE}
+plot(res,choix="ind",partial="all")
+```
+
+We can see in Figure 3.24. how close are the two points of view for each perfume. This is particularly true for perfumes such as ***J'adore EP*** and ***J'adore ET***. In Figure 3.24, we can see also that the differences between experts and consumers for ***Angel*** (resp. ***Shalimar***) are due essentially to the first (resp. second) axis, and must be interpreted with respect to that axis.

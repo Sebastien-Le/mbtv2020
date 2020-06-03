@@ -8,3 +8,5 @@ usethis::use_tidy_description()
 attachment::att_to_description()
 
 usethis ::use_tutorial(name= "Consumer data", title= "Analyzing consumer data")
+
+usethis::use_git()

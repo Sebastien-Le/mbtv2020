@@ -1,0 +1,272 @@
+---
+title: "Tutorial_ACM"
+output: 
+  learnr::tutorial:
+    progressive: true
+    allow skip: true
+runtime: shiny_prerendered
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(learnr)
+library(SensoMineR)
+library(missMDA)
+library(ade4)
+library(dplyr)
+data("lipsticks")
+res.mca<-MCA(lipsticks[,41:49],graph=FALSE)
+```
+
+## Multiple correspondence analysis (MCA)
+
+  Multiple correspondence analysis (MCA) applies when individuals are described by qualitative variables through their modalities. In MCA, the data set to be analyzed is structured the following way: rows correspond to individuals or statistical units, columns correspond to variables; at the intersection of one row $i$ and one column $j$, the modality taken by individual $i$ for variable $j$.
+  
+  MCA can be seen as a “mix” between PCA and CA. It's an extension of PCA in the sense that individuals are described by a set of qualitative variables. It's an extension of CA in the sense that it deals with more than two qualitative variables. The main objective of the method is to provide a 2-dimensionnal representation of the individuals that best represents their distances, and a 2-dimensionnal representation of the modalities that best represents their mutual associations. As in CA, MCA provides a joint representation of the rows and the columns, more accurately a joint representation of the individuals and the modalities associated with the qualitative variables.
+  
+  This method is mainly used in a questionnaire context, as questions can be assimilated to qualitative variables. In consumer studies, MCA is used to understand respondents with respect to their profiles in terms of answers. From a consumer point of view, the method provides a graphical representation of the consumers such that, two consumers are all the more close, that they have answered similarly to the questionnaire. From a questionnaire point of view, the method provides a graphical representation of the items of the questionnaire such that, two items are all the more close that they represent similar consumers (consumers that have similar profiles in terms of answers to the questionnaire).
+  
+  To illustrate the method, we consider a consumer study in which 80 respondents are asked to answer to “usage and attitude” questions with respect to makeup. In terms of “usage”, the question that have been asked are: How do you use makeup on your skin? Your eyes? Your lips? How often do you use makeup? How often do you use the following products: foundation, blusher...?
+
+```{r data_sum, echo=TRUE}
+head(lipstick)
+```
+
+  As you can see, our dataset is filled with either quantitatives and qualitatives variables, so first we need to sort our data in order to be able to perform MCA with the `FactoMineR`package. Among our 157 columns we have 56 qualitative variables starting from columns 41 with *"How.do.you.apply.makeup.on.your.skin"* to column 97 *"Why.not.lipstick.don.t.know.how.to.use"*. In fact this is really too much to perform MCA on that much variables. For this tutorial we will focus on 9 variables, from column 41 to 49. We could take the remaining 149 variables as illustratives variables but we won't.  
+  Try to perform MCA on the data we selected previously on the text with the `MCA`function of `FactoMineR`:
+```{r MCA, exercise=TRUE}
+
+```
+  
+```{r MCA-hint}
+?MCA
+```
+
+Table 3.6 shows an extract of the data set on which MCA is performed.
+According to Table 3.6, individuals 75 and 73 (resp. 55 and 53) seem to have a similar profile in terms of behavior; they also seem to behave totally differently than 55 and 53.
+
+**TABLE 3.6**
+**Extract of the Data Set on Which MCA Is Performed: How Do You Use Makeup on Your Skin? Your Eyes? Your Lips? How Often Do You Use Makeup? How Often Do You Use the Following Products: Foundation, Blusher?**
+
+```{r don, echo=FALSE}
+don.int<-lipstick[c(75,73,55,53),c(41:46)]
+colnames(don.int)<-c("On Skin","On Eyes","On Lips","Freq. Makeup","Freq. Foundation","Freq. Blusher")
+print(don.int)
+```
+
+In order to calculate distances between individuals on the one hand, distance between modalities on the other hand, we transform **Table3.6**. into a dummy variables data set. We introduce the so-called complete disjunctive data table of dimension $(n,K)$, where $n$ is the number of individuals and $K$ is the total number of modalities over the $p$ qualitative variables. At the intersection of one row and one column, $x_{ik}=1$ if individual $i$ has chosen the modality $k$ and 0 otherwise.
+
+With the `acm.disjonctif` function of the `ade4`package, try to retrieve the complete disjonctive data table of the first 2 variables of `don.int`:
+```{r tab_disj_comp,exercise=TRUE}
+library(ade4)
+tab.disj.comp<-
+print(tab.disj.comp)
+```
+
+```{r tab_disj_comp-hint}
+?acm.disjonctif
+```
+**TABLE 3.7**
+**Extract of the Complete Disjunctive Data Table: How Do You Use Makeup on Your Skin? Your Eyes?**
+
+Let $I_k$ be the number of individuals that have chosen modality $k$. In MCA, the squared distance between two individuals $i$ and $i'$ can be expressed the following way:
+
+$$d^{2}\left(i, i^{\prime}\right)=C \sum_{k=1}^{K} \frac{\left(x_{i k}-x_{i^{\prime} k}\right)^{2}}{I_{k}}$$
+
+where C denotes a constant that will be determined later.
+As $\left(x_{i k}-x_{i^{\prime} k}\right)^{2}$ equals 1 (resp. 0) when $i$ and $i'$ have answered differently (resp. similarly) for item $k$, this distance is the sum of the differences over all modalities, weighted by $1/I_k$:  
+
+  1. The distance between two individuals equals 0, if they have the same profile of answers, in other words if they have selected the same items.  
+  
+  2. The distance between two individuals is rather small, if they have a similar profile of answers, in other words if they have in common a rather high number of items.  
+  
+  3. The distance between two individuals is rather high, if one of the items they don't have in common is specific of one of them, even though they might have in common a lot of items.  
+  
+  4. The distance between two individuals is rather small, if one of the items they have in common is specific of both of them, even though they might not have in common a lot of items.  
+  
+Let $I_{k≠k'}$ denote the number of individuals which have chosen either modality $k$, or either modality $k'$. The distance between two modalities $k$ and $k'$ can be expressed the following way:
+
+$$d^{2}\left(k, k^{\prime}\right)=C^{\prime} \frac{I_{k \neq k^{\prime}}}{I_{k} I_{k^{\prime}}}$$
+where C' denotes a constant that will be explained later.  
+According to this formula, the distance between two modalities $k$ and $k'$ is all the more small, that the number of individuals they have in common is high.   
+
+To understand the importance of the weighting, let us consider three modalities $k$, $k'$ and $k''$, each composed of 10, 100 and 100 individuals respectively. If modalities k and k' have no common individuals, then $I_{(k≠k')}=110$. If modalities $k'$ and $k''$ have 45 common individuals, then $I_{(k'≠k'')}=110$. However, $k$ and $k'$ have no individuals in common whereas $k'$ and $k''$ have in common 45% of their individuals. Modalities $k$ and $k'$ should be more distant than modalities $k'$ and $k''$. It is therefore important to take into account the sample size for each modality. Finally, in our example,
+
+$$d^{2}\left(k, k^{\prime}\right)=\frac{110}{10 * 100}>d^{2}\left(k^{\prime}, k^{\prime \prime}\right)=\frac{110}{100 * 100}$$
+
+From a theoretical point of view, it can be shown that MCA is equivalent to a CA applied to the complete disjunctive data table. Hence, when applying the Chi-square distance on this data table, we can show that
+
+$$d^{2}\left(i, i^{\prime}\right)=\frac{n}{p} \sum_{k=1}^{K} \frac{\left(x_{i k}-x_{i^{\prime} k}\right)^{2}}{I_{k}}$$ and $$d^{2}\left(k, k^{\prime}\right)=n \frac{I_{k \neq k^{\prime}}}{I_{k} I_{k^{\prime}}}$$
+
+
+
+
+
+```{r gr_ind, exercise=TRUE}
+plot.MCA(res.mca,choix="ind",invisible="var")
+```
+
+**Figure 3.14 Representation of the consumers on the first and second**
+**dimensions of the MCA: the closer two consumers are, the more similar behavior in terms of makeup usage and attitudes they have.**
+
+Once the distance among individuals is calculated, MCA finds the sequence of axes that best represent the individuals, as explained previously. **Figure 3.14** represent the 80 consumers on the two first principal dimensions. With a value of 11,34% (resp. 9,93%), the percentage of variability associated with the first dimension (resp. second dimension) seems rather low. It is often the case with MCA, and these percentages associated with the eigenvalues are rarely interpretable as they are often underestimated: this is due to the coding into dummy variables that induces an artificial orthogonality of the columns of the data set.
+The first dimension opposes individuals 75 and 73, on the one hand, to individuals 55 and 53 on the other (cf. Figure 3.14). As we can see in the original data, in Table 3.6, this opposition was expected.  
+
+In most cases, the representation of the modalities (cf. Figure 3.15) is not exploitable, due to the high number of modalities to be represented.
+```{r gr_var, echo=TRUE}
+plot.MCA(res.mca,chois="var",invisible="ind",col.var="black")
+```
+
+Figure 3.16 is an extract of the representation of the modalities (or items) of the questionnaire. To obtain this representation, we first calculate an index of quality of representation based on the sum over the two first dimensions of the cosine squared of each modality on each dimension. Then, we represent those modalities which quality of representation is higher than a given arbitrary threshold (equal to 0,3 in this example).
+
+Try to show only modalities with a $cos^2$ superior to 0.3 and change the size of the label to 0.7.
+```{r gr_var_2, exercise=TRUE}
+
+```
+
+```{r gr_var_2-hint,eval=FALSE}
+To gain visibility use parameters like selectMod to apply filter on modalities, or cex to choose the size of the labels.
+```
+
+To interpret this graphical output, one of the most common strategies is to list the modalities that are significantly related to the each dimension. Table 3.4. The ten most meaningful modalities (items of the questionnaire) on the negative side of the first dimension of the Multiple Correspondence Analysis. lists the ten most meaningful modalities (items) on the positive side of the first dimension. Those modalities are interrelated, in the sense that on the “left side” of the plane, the same consumers (consumers 75 and 73, for instance) have mainly chosen those modalities. These consumers use makeup on a daily basis.
+
+**TABLE 3.8**
+**Ten Most Meaningful Active Modalities (Items of the Questionnaire) on the Positive Side of the First Dimension of the MC**
+```{r most_table,echo=FALSE}
+f<-as.data.frame(res.mca$var$coord)
+f$Name<-rownames(f)
+m<- f %>%
+  arrange(desc(f$`Dim 1`))%>%
+  head(10)
+last<-dim(f)[2]
+m<-m[,c(last,1)]
+print(m)
+```
+
+In the same way, Table 3.9 lists the 10 most meaningful modalities
+(items) on the negative side of the first dimension. Those modalities are
+interrelated, in the sense that on the right side of the plane, the same consumers (consumers 55 and 53, for instance) have mainly chosen those
+modalities. These consumers use makeup occasionally.
+
+Try to make the table 3.9 yourself:
+
+**TABLE 3.9**
+**Ten Most Meaningful Active Modalities (Items of the Questionnaire) on the Negative Side of the First Dimension of the MC**
+```{r less_table, exercise=TRUE}
+
+```
+
+```{r less_table-hint-1, eval=FALSE}
+1. The data you need are in res.mca$var$coord, you need to transform them into a dataframe.
+
+2. Retrieve the names of the modalities
+
+3. Rearrange your dataframe
+
+4. Select only the columns you need
+
+5. Print your result
+
+```
+
+```{r less_table-hint-2}
+1. as.data.frame()
+
+2. Create a new column or vector with rownames() for values
+
+3. l<- f %>%
+      arrange(f$`Dim 1`)%>%
+      head(10)
+
+4. cbind your vector or [,c("Modalities_names",1)] if you have created a new column
+
+5. print()
+```
+
+```{r less_table-hint-3}
+1. f<-as.data.frame(res.mca$var$coord)
+
+2. f$Name<-rownames(f)
+
+3. arrange
+
+4. last<-dim(f)[2]
+   l<-l[,c(last,1)]
+
+5. print(l)
+```
+
+In the same way as in PCA or CA, illustrative information can be added and represented as shown in Figure 3.17. In the case of illustrative quantitative variables, the information is represented as in PCA, through the correlation circle, whereas in the case of illustrative qualitative variables, the information is represented as in CA, through the common representation of the rows and the columns.
+In our example, the “attitude” questions were considered as illustrative information: For which reasons did you begin to makeup? What is the main occasion to makeup? For which reasons do you makeup? For whom do you makeup?
+
+```{r gr_var_3,echo=TRUE}
+plot.MCA(res.mca,chois="var",invisible="ind",col.var="black",selectMod = "cos2 2",cex=0.7)
+```
+
+For whom do you make up?
+It is interesting to see that from a consumer perspective, the main
+dimension of variability induced by the active variables only (in the case, the usage questions) is related to the notion of seduction: on one side of the plane, consumers who apply makeup every day, for no particular reason,
+and certainly not to seduce, and on the other side of the plane, consumers who rarely apply makeup, but when they do, we can suppose that it is when they go out, in order to seduce (Table 3.10).
+
+**TABLE 3.10**
+**Two Most Meaningful Illustrative Modalities on the First Dimension of the MC**
+```{r ml_2_table, echo=FALSE}
+f<-as.data.frame(res.mca$var$coord)
+f$Name<-rownames(f)
+m<- f %>%
+  arrange(desc(f$`Dim 1`))%>%
+  head(2)
+last<-dim(f)[2]
+m<-m[,c(last,1)]
+l<- f %>%
+  arrange(f$`Dim 1`)%>%
+  head(2)
+last<-dim(f)[2]
+l<-l[,c(last,1)]
+ml<-cbind(m,l)
+colnames(ml)<-c("Positive side","Dim 1","Negative side","Dim 1")
+print(ml)
+```
+
+Remark: Despite its seemingly low percentage of variability, the second axis is particularly interesting in terms of illustrative information as it is clearly related to the notion of confidence (Table 3.11).
+
+Try to retrieve the table 3.11:
+
+**TABLE 3.11**
+**Eight Most Meaningful Illustrative Modalities on the Second Dimension of the MCA**
+```{r ml_8_table, exercise=TRUE}
+
+```
+
+```{r ml_8_table-hint-1, eval=FALSE}
+Same operations than the previous table you made, you just need to combine your 2 intermediate tables together.
+
+1. The data you need are in res.mca$var$coord, you need to transform them into a dataframe.
+
+2. Retrieve the names of the modalities
+
+3. Rearrange your dataframe
+
+4. Select only the columns you need
+
+5. Print your result
+
+```
+
+```{r ml_8_table-hint-2}
+f<-as.data.frame(res.mca$var$coord)
+f$Name<-rownames(f)
+m<- f %>%
+  arrange(desc(f$`Dim 2`))%>%
+  head(8)
+last<-dim(f)[2]
+m<-m[,c(last,1)]
+l<- f %>%
+  arrange(f$`Dim 2`)%>%
+  head(8)
+last<-dim(f)[2]
+l<-l[,c(last,1)]
+ml<-cbind(m,l)
+colnames(ml)<-c("Positive side","Dim 2","Negative side","Dim 2")
+print(ml)
+```
